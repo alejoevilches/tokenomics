@@ -21,4 +21,16 @@ contract TestTokenomics is Test {
         assertEq(tokenomics.currentTerm(), 1);
         assertEq(tokenomics.startingTimeOfTerm(), block.number);
     }
+
+    function testStakeIsDone() public {
+        tokenomics.transfer(msg.sender, 200);
+        tokenomics.stake(100);
+        vm.expectEmit(false, false, false, true);
+        emit Tokenomics.Staked(msg.sender, 100);
+        (uint256 stakedAmount, uint256 lockedUntil, ) = tokenomics
+            .stakedPerAccount(msg.sender);
+        assertEq(lockedUntil, block.number + 100800);
+        assertEq(stakedAmount, 100);
+        assertEq(tokenomics.volumePerTerm(), 100);
+    }
 }
