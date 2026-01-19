@@ -17,7 +17,7 @@ contract Tokenomics is ERC20 {
     uint256 public volumePerTerm;
     uint256 public startingTimeOfTerm;
     uint256 public currentSupply;
-    uint256 public currentTerm = 1;
+    uint256 public currentTerm;
     uint256 public lastTermClosed;
     uint256 public rewardIndex;
 
