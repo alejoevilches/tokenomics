@@ -14,18 +14,40 @@ contract Tokenomics is ERC20 {
     uint256 public constant LOCK_PERIOD = 100800; //14 days
     uint256 public volumePerTerm;
     uint256 public startingTimeOfTerm;
+    uint256 public currentSupply;
+    uint256 public currentTerm = 1;
+    uint256 public lastTermClosed;
 
     error Stake_InvalidAmount();
     error Unstake_NotEnoughAmountStaked();
     error Unstake_InvalidAmount();
     error Unstake_StakeLocked();
     error CreateNewSupply_NotEnoughVolume();
+    error CheckTerm_WrongTerm();
 
     event Staked(address account, uint256 amount);
     event Unstaked(address account, uint256 amount);
 
+    modifier checkTerm() {
+        if (block.number > startingTimeOfTerm + LOCK_PERIOD) {
+            if (currentTerm > lastTermClosed) {
+                startingTimeOfTerm = block.number;
+                if (volumePerTerm >= (currentSupply * 10) / 100) {
+                    _mint(address(this), (currentSupply * 10) / 100);
+                    currentSupply = totalSupply();
+                }
+                _startNewTerm();
+            }
+        }
+        _;
+    }
+
     constructor() ERC20("Tokenomics", "TKN") {
-        _mint(msg.sender, INITIAL_SUPPLY);
+        _mint(address(this), INITIAL_SUPPLY);
+        currentSupply = totalSupply();
+        startingTimeOfTerm = block.number;
+        volumePerTerm = 0;
+        currentTerm++;
     }
 
     function createNewSupply() public {
@@ -56,5 +78,11 @@ contract Tokenomics is ERC20 {
         volumePerTerm += amount;
         _transfer(address(this), msg.sender, amount);
         emit Unstaked(msg.sender, amount);
+    }
+
+    function _startNewTerm() internal {
+        currentTerm++;
+        lastTermClosed++;
+        volumePerTerm = 0;
     }
 }
