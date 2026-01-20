@@ -84,4 +84,14 @@ contract TestTokenomics is Test {
         vm.expectRevert(Tokenomics.Unstake_NotEnoughAmountStaked.selector);
         tokenomics.unstake(500);
     }
+
+    function testStakerIsRewarded() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.startPrank(msg.sender);
+        tokenomics.stake(100);
+        vm.roll(block.number + 100800);
+        tokenomics.rewardStaker();
+        vm.stopPrank();
+    }
 }

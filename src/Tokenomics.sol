@@ -65,6 +65,7 @@ contract Tokenomics is ERC20 {
         if (amount == 0) revert Stake_InvalidAmount();
         stakedPerAccount[msg.sender].amount += amount;
         stakedPerAccount[msg.sender].lockedUntil = block.number + LOCK_PERIOD;
+        stakedPerAccount[msg.sender].userRewardIndex = rewardIndex;
         totalStaked += amount;
         volumePerTerm += amount;
         _transfer(msg.sender, address(this), amount);
