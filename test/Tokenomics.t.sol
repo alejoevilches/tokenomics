@@ -12,7 +12,6 @@ contract TestTokenomics is Test {
     function setUp() public {
         deploy = new DeployTokenomics();
         tokenomics = deploy.run();
-        vm.prank(msg.sender);
     }
 
     function testTokenIsCreated() public view {
@@ -23,14 +22,66 @@ contract TestTokenomics is Test {
     }
 
     function testStakeIsDone() public {
+        vm.prank(address(tokenomics));
         tokenomics.transfer(msg.sender, 200);
-        tokenomics.stake(100);
+        vm.prank(msg.sender);
         vm.expectEmit(false, false, false, true);
         emit Tokenomics.Staked(msg.sender, 100);
+        tokenomics.stake(100);
         (uint256 stakedAmount, uint256 lockedUntil, ) = tokenomics
             .stakedPerAccount(msg.sender);
         assertEq(lockedUntil, block.number + 100800);
         assertEq(stakedAmount, 100);
         assertEq(tokenomics.volumePerTerm(), 100);
+    }
+
+    function testStakeRevertsIfAmountIsInvalid() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.expectRevert(Tokenomics.Stake_InvalidAmount.selector);
+        tokenomics.stake(0);
+    }
+
+    function testUnstakeIsDone() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.prank(msg.sender);
+        tokenomics.stake(200);
+        vm.roll(block.number + 100800);
+        vm.expectEmit(false, false, false, true);
+        emit Tokenomics.Unstaked(msg.sender, 200);
+        vm.prank(msg.sender);
+        tokenomics.unstake(200);
+        (uint256 stakedAmount, , ) = tokenomics.stakedPerAccount(msg.sender);
+        assertEq(stakedAmount, 0);
+        assertEq(tokenomics.volumePerTerm(), 400);
+    }
+
+    function testUnstakeRevertsIfAmountIsInvalid() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.startPrank(msg.sender);
+        tokenomics.stake(200);
+        vm.expectRevert(Tokenomics.Unstake_InvalidAmount.selector);
+        tokenomics.unstake(0);
+    }
+
+    function testUnstakeRevertsIfStakeIsLocked() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.startPrank(msg.sender);
+        tokenomics.stake(200);
+        vm.expectRevert(Tokenomics.Unstake_StakeLocked.selector);
+        tokenomics.unstake(200);
+    }
+
+    function testUnstakeRevertsIfNotEnoughTokenIsStaked() public {
+        vm.prank(address(tokenomics));
+        tokenomics.transfer(msg.sender, 200);
+        vm.startPrank(msg.sender);
+        tokenomics.stake(200);
+        vm.roll(block.number + 100800);
+        vm.expectRevert(Tokenomics.Unstake_NotEnoughAmountStaked.selector);
+        tokenomics.unstake(500);
     }
 }
