@@ -5,9 +5,9 @@ import {Script} from "forge-std/Script.sol";
 import {Tokenomics} from "src/Tokenomics.sol";
 
 contract DeployTokenomics is Script {
-    function run() public returns (Tokenomics) {
+    function run(address treasury) public returns (Tokenomics) {
         vm.startBroadcast();
-        Tokenomics tokenomics = new Tokenomics();
+        Tokenomics tokenomics = new Tokenomics(treasury);
         vm.stopBroadcast();
         return tokenomics;
     }

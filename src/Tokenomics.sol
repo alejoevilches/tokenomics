@@ -13,7 +13,7 @@ contract Tokenomics is ERC20 {
 
     uint256 totalStaked;
     uint256 public constant INITIAL_SUPPLY = 100000 ether;
-    uint256 public constant LOCK_PERIOD = 100800; //14 days
+    uint256 public constant LOCK_PERIOD = 14 days;
     uint256 public constant PRECISION = 1e18;
     uint256 public volumePerTerm;
     uint256 public startingTimeOfTerm;
@@ -21,6 +21,8 @@ contract Tokenomics is ERC20 {
     uint256 public currentTerm;
     uint256 public lastTermClosed;
     uint256 public rewardIndex;
+    address public treasury;
+    uint256 public undistributedRewards;
 
     error Stake_InvalidAmount();
     error Unstake_NotEnoughAmountStaked();
@@ -37,15 +39,17 @@ contract Tokenomics is ERC20 {
     event AccountRewarded(address account);
 
     modifier CheckTerm() {
-        if (block.number > startingTimeOfTerm + LOCK_PERIOD) {
+        if (block.timestamp > startingTimeOfTerm + LOCK_PERIOD) {
             if (currentTerm > lastTermClosed) {
-                startingTimeOfTerm = block.number;
+                startingTimeOfTerm = block.timestamp;
                 uint256 amountToMint = (currentSupply * 10) / 100;
                 if (volumePerTerm >= amountToMint) {
-                    _mint(address(this), amountToMint);
                     currentSupply = totalSupply();
+                    _mint(address(this), amountToMint);
                     if (totalStaked > 0) {
                         rewardIndex += (amountToMint * PRECISION) / totalStaked;
+                    } else {
+                        undistributedRewards += amountToMint;
                     }
                 }
                 _startNewTerm();
@@ -54,10 +58,11 @@ contract Tokenomics is ERC20 {
         _;
     }
 
-    constructor() ERC20("Tokenomics", "TKN") {
-        _mint(address(this), INITIAL_SUPPLY);
+    constructor(address _treasury) ERC20("Tokenomics", "TKN") {
+        treasury = _treasury;
+        _mint(treasury, INITIAL_SUPPLY);
         currentSupply = totalSupply();
-        startingTimeOfTerm = block.number;
+        startingTimeOfTerm = block.timestamp;
         volumePerTerm = 0;
         currentTerm++;
     }
@@ -66,7 +71,9 @@ contract Tokenomics is ERC20 {
         if (amount == 0) revert Stake_InvalidAmount();
         _accreditRewards(msg.sender);
         stakedPerAccount[msg.sender].amount += amount;
-        stakedPerAccount[msg.sender].lockedUntil = block.number + LOCK_PERIOD;
+        stakedPerAccount[msg.sender].lockedUntil =
+            block.timestamp +
+            LOCK_PERIOD;
         totalStaked += amount;
         volumePerTerm += amount;
         _transfer(msg.sender, address(this), amount);
@@ -75,7 +82,7 @@ contract Tokenomics is ERC20 {
 
     function unstake(uint256 amount) external CheckTerm {
         if (amount == 0) revert Unstake_InvalidAmount();
-        if (block.number < stakedPerAccount[msg.sender].lockedUntil)
+        if (block.timestamp < stakedPerAccount[msg.sender].lockedUntil)
             revert Unstake_StakeLocked();
         if (stakedPerAccount[msg.sender].amount < amount)
             revert Unstake_NotEnoughAmountStaked();
@@ -104,17 +111,5 @@ contract Tokenomics is ERC20 {
             }
         }
         s.userRewardIndex = rewardIndex;
-    }
-
-    function rewardStaker() external CheckTerm {
-        if (stakedPerAccount[msg.sender].amount == 0)
-            revert RewardStaker_NoTokenStaked();
-        uint256 stakedAmount = stakedPerAccount[msg.sender].amount;
-        uint256 userRewardIndex = stakedPerAccount[msg.sender].userRewardIndex;
-        uint256 pendingTransfer = (stakedAmount *
-            (rewardIndex - userRewardIndex)) / PRECISION;
-        if (pendingTransfer == 0) revert RewardStaker_NoRewardPending();
-        stakedPerAccount[msg.sender].userRewardIndex = rewardIndex;
-        emit AccountRewarded(msg.sender);
     }
 }

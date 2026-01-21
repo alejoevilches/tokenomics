@@ -10,15 +10,16 @@ contract TestTokenomics is Test {
     DeployTokenomics deploy;
 
     function setUp() public {
+        address treasury = makeAddr("treasury");
         deploy = new DeployTokenomics();
-        tokenomics = deploy.run();
+        tokenomics = deploy.run(treasury);
     }
 
     function testTokenIsCreated() public view {
         assertEq(tokenomics.currentSupply(), 100000 ether);
         assertEq(tokenomics.volumePerTerm(), 0);
         assertEq(tokenomics.currentTerm(), 1);
-        assertEq(tokenomics.startingTimeOfTerm(), block.number);
+        assertEq(tokenomics.startingTimeOfTerm(), block.timestamp);
     }
 
     function testStakeIsDone() public {
@@ -30,7 +31,7 @@ contract TestTokenomics is Test {
         tokenomics.stake(100);
         (uint256 stakedAmount, uint256 lockedUntil, ) = tokenomics
             .stakedPerAccount(msg.sender);
-        assertEq(lockedUntil, block.number + 100800);
+        assertEq(lockedUntil, block.timestamp + 14 days);
         assertEq(stakedAmount, 100);
         assertEq(tokenomics.volumePerTerm(), 100);
     }
@@ -47,7 +48,7 @@ contract TestTokenomics is Test {
         tokenomics.transfer(msg.sender, 200);
         vm.prank(msg.sender);
         tokenomics.stake(200);
-        vm.roll(block.number + 100800);
+        vm.roll(block.timestamp + 14 days);
         vm.expectEmit(false, false, false, true);
         emit Tokenomics.Unstaked(msg.sender, 200);
         vm.prank(msg.sender);
@@ -80,18 +81,8 @@ contract TestTokenomics is Test {
         tokenomics.transfer(msg.sender, 200);
         vm.startPrank(msg.sender);
         tokenomics.stake(200);
-        vm.roll(block.number + 100800);
+        vm.roll(block.timestamp + 14 days);
         vm.expectRevert(Tokenomics.Unstake_NotEnoughAmountStaked.selector);
         tokenomics.unstake(500);
-    }
-
-    function testStakerIsRewarded() public {
-        vm.prank(address(tokenomics));
-        tokenomics.transfer(msg.sender, 200);
-        vm.startPrank(msg.sender);
-        tokenomics.stake(100);
-        vm.roll(block.number + 100800);
-        tokenomics.rewardStaker();
-        vm.stopPrank();
     }
 }
