@@ -2,6 +2,12 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+/**
+ * @title Tokenomics
+ * @author Alejo Vilches
+ * @notice This contracts creates a ERC20 token, a staking system with lockups and a term-based emission schedule.
+ */
+
 contract Tokenomics is ERC20 {
     struct StakePosition {
         uint256 amount;

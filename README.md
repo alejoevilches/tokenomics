@@ -1,66 +1,78 @@
-## Foundry
+# Tokenomics - ERC20 with Staking Terms and Emission Controls
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+This repo is a focused Solidity project that demonstrates a complete tokenomics loop:
+an ERC20 token, a staking system with lockups, and a term-based emission schedule
+gated by on-chain "volume" (staking + unstaking activity). It is built and tested
+with Foundry.
 
-Foundry consists of:
+## What this project does
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- Mints an initial supply to a treasury address on deployment.
+- Allows holders to stake tokens into the contract with a fixed lock period.
+- Tracks staking volume per term and mints new rewards only if volume meets a threshold.
+- Distributes rewards to stakers via a cumulative reward index.
 
-## Documentation
+## How the tokenomics works
 
-https://book.getfoundry.sh/
+The system runs in repeating terms of `LOCK_PERIOD` (14 days).
 
-## Usage
+At the end of a term, the contract attempts to mint **10% of current supply** as rewards,
+but only if `volumePerTerm >= amountToMint`. The volume is the sum of all staked and
+unstaked amounts during the term. If there are no stakers, rewards are accumulated as
+`undistributedRewards` (currently tracked but not redistributed).
 
-### Build
+Rewards are distributed using an index:
 
-```shell
-$ forge build
-```
+- `rewardIndex` increases when rewards are minted.
+- Each staker stores `userRewardIndex`.
+- On stake/unstake, rewards are credited based on the delta.
 
-### Test
+## Core contract
 
-```shell
-$ forge test
-```
+- `src/Tokenomics.sol`
+  - ERC20 token named `Tokenomics` with symbol `TKN`.
+  - Initial supply: `100000 ether` minted to the treasury.
+  - Staking locks tokens for 14 days.
+  - Term-based reward emissions with volume gating.
 
-### Format
+## Key features
 
-```shell
-$ forge fmt
-```
+- **Term gating:** emissions only happen if there is enough activity.
+- **Stake locking:** prevents immediate unstaking to discourage short-term farming.
+- **Reward index accounting:** efficient pro-rata distribution to stakers.
+- **Custom errors and events:** clean reverts and observability for UI/indexers.
 
-### Gas Snapshots
+## Project structure
 
-```shell
-$ forge snapshot
-```
+- `src/Tokenomics.sol` - Core smart contract.
+- `test/Tokenomics.t.sol` - Foundry tests for staking and safety checks.
+- `script/DeployTokenomics.s.sol` - Deployment script.
+- `foundry.toml` - Foundry configuration.
 
-### Anvil
+## Quick start
 
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
+Install Foundry and run:
 
 ```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+forge build
+forge test
 ```
+
+## Deploy
+
+```shell
+forge script script/DeployTokenomics.s.sol:DeployTokenomics --rpc-url <RPC_URL> --private-key <PRIVATE_KEY> --broadcast
+```
+
+## Notes for reviewers
+
+- This is a compact, auditable example of a tokenomics model, not a production-ready
+  protocol. Things like `undistributedRewards` handling, access control, and extended
+  emissions logic can be added depending on product goals.
+- The tests focus on staking/unstaking behavior and revert conditions.
+
+## Tech stack
+
+- Solidity `^0.8.0`
+- OpenZeppelin ERC20
+- Foundry (Forge, Script)
