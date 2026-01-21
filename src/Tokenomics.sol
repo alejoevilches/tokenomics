@@ -10,6 +10,7 @@ contract Tokenomics is ERC20 {
     }
 
     mapping(address => StakePosition) public stakedPerAccount;
+
     uint256 totalStaked;
     uint256 public constant INITIAL_SUPPLY = 100000 ether;
     uint256 public constant LOCK_PERIOD = 100800; //14 days
@@ -63,9 +64,9 @@ contract Tokenomics is ERC20 {
 
     function stake(uint256 amount) external CheckTerm {
         if (amount == 0) revert Stake_InvalidAmount();
+        _accreditRewards(msg.sender);
         stakedPerAccount[msg.sender].amount += amount;
         stakedPerAccount[msg.sender].lockedUntil = block.number + LOCK_PERIOD;
-        stakedPerAccount[msg.sender].userRewardIndex = rewardIndex;
         totalStaked += amount;
         volumePerTerm += amount;
         _transfer(msg.sender, address(this), amount);
@@ -78,6 +79,7 @@ contract Tokenomics is ERC20 {
             revert Unstake_StakeLocked();
         if (stakedPerAccount[msg.sender].amount < amount)
             revert Unstake_NotEnoughAmountStaked();
+        _accreditRewards(msg.sender);
         stakedPerAccount[msg.sender].amount -= amount;
         totalStaked -= amount;
         volumePerTerm += amount;
@@ -91,6 +93,19 @@ contract Tokenomics is ERC20 {
         volumePerTerm = 0;
     }
 
+    function _accreditRewards(address account) internal {
+        StakePosition storage s = stakedPerAccount[account];
+        uint256 delta = rewardIndex - s.userRewardIndex;
+        if (delta > 0 && s.amount > 0) {
+            uint256 pending = (s.amount * delta) / PRECISION;
+            if (pending > 0) {
+                _transfer(address(this), account, pending);
+                emit AccountRewarded(account);
+            }
+        }
+        s.userRewardIndex = rewardIndex;
+    }
+
     function rewardStaker() external CheckTerm {
         if (stakedPerAccount[msg.sender].amount == 0)
             revert RewardStaker_NoTokenStaked();
@@ -99,7 +114,6 @@ contract Tokenomics is ERC20 {
         uint256 pendingTransfer = (stakedAmount *
             (rewardIndex - userRewardIndex)) / PRECISION;
         if (pendingTransfer == 0) revert RewardStaker_NoRewardPending();
-        _transfer(address(this), msg.sender, pendingTransfer);
         stakedPerAccount[msg.sender].userRewardIndex = rewardIndex;
         emit AccountRewarded(msg.sender);
     }
