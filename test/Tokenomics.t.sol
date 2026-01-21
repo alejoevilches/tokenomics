@@ -8,14 +8,15 @@ import {DeployTokenomics} from "../script/DeployTokenomics.s.sol";
 contract TestTokenomics is Test {
     Tokenomics tokenomics;
     DeployTokenomics deploy;
+    address treasury = makeAddr("treasury");
 
     function setUp() public {
-        address treasury = makeAddr("treasury");
         deploy = new DeployTokenomics();
         tokenomics = deploy.run(treasury);
     }
 
     function testTokenIsCreated() public view {
+        assertEq(tokenomics.treasury(), treasury);
         assertEq(tokenomics.currentSupply(), 100000 ether);
         assertEq(tokenomics.volumePerTerm(), 0);
         assertEq(tokenomics.currentTerm(), 1);
@@ -23,7 +24,7 @@ contract TestTokenomics is Test {
     }
 
     function testStakeIsDone() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
         vm.prank(msg.sender);
         vm.expectEmit(false, false, false, true);
@@ -37,29 +38,29 @@ contract TestTokenomics is Test {
     }
 
     function testStakeRevertsIfAmountIsInvalid() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
         vm.expectRevert(Tokenomics.Stake_InvalidAmount.selector);
         tokenomics.stake(0);
     }
 
     function testUnstakeIsDone() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
-        vm.prank(msg.sender);
+        vm.startPrank(msg.sender);
         tokenomics.stake(200);
-        vm.roll(block.timestamp + 14 days);
+        vm.warp(block.timestamp + 15 days);
         vm.expectEmit(false, false, false, true);
         emit Tokenomics.Unstaked(msg.sender, 200);
-        vm.prank(msg.sender);
         tokenomics.unstake(200);
+        vm.stopPrank();
         (uint256 stakedAmount, , ) = tokenomics.stakedPerAccount(msg.sender);
         assertEq(stakedAmount, 0);
-        assertEq(tokenomics.volumePerTerm(), 400);
+        assertEq(tokenomics.volumePerTerm(), 200);
     }
 
     function testUnstakeRevertsIfAmountIsInvalid() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
         vm.startPrank(msg.sender);
         tokenomics.stake(200);
@@ -68,7 +69,7 @@ contract TestTokenomics is Test {
     }
 
     function testUnstakeRevertsIfStakeIsLocked() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
         vm.startPrank(msg.sender);
         tokenomics.stake(200);
@@ -77,11 +78,11 @@ contract TestTokenomics is Test {
     }
 
     function testUnstakeRevertsIfNotEnoughTokenIsStaked() public {
-        vm.prank(address(tokenomics));
+        vm.prank(treasury);
         tokenomics.transfer(msg.sender, 200);
         vm.startPrank(msg.sender);
         tokenomics.stake(200);
-        vm.roll(block.timestamp + 14 days);
+        vm.warp(block.timestamp + 15 days);
         vm.expectRevert(Tokenomics.Unstake_NotEnoughAmountStaked.selector);
         tokenomics.unstake(500);
     }
